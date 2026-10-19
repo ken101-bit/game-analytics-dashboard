@@ -1,6 +1,12 @@
 from fastapi import FastAPI, HTTPException
+from pydantic import BaseModel
 
 app = FastAPI()
+class PlayerCreate(BaseModel):
+    name: str
+    wins: int
+    losses: int
+    kills: int
 
 players = {
     1: {"name": "Dragon99", "wins": 25, "losses": 10},
@@ -42,9 +48,34 @@ def get_player(player_id: int):
             player["wins"] / total_games * 100, 2
         )
 
+    if total_games == 0:
+        kills_per_game = 0
+    else:
+        kills_per_game = round(player.get("kills", 0) / total_games, 2)
+
     return {
         "name": player["name"],
         "wins": player["wins"],
         "losses": player["losses"],
-        "win_rate": win_rate
+        "kills": player.get("kills", 0),
+        "win_rate": win_rate,
+        "kills_per_game": kills_per_game
+    }
+    
+
+    
+@app.post("/players")
+def create_player(player: PlayerCreate):
+    new_id = max(players.keys(), default=0) + 1
+
+    players[new_id] = {
+        "name": player.name,
+        "wins": player.wins,
+        "losses": player.losses,
+        "kills": player.kills
+    }
+
+    return {
+        "message": "Player created successfully",
+        "player_id": new_id
     }
