@@ -1,5 +1,7 @@
+import sqlite3
 from fastapi import FastAPI, HTTPException
 from pydantic import BaseModel
+
 
 app = FastAPI()
 class PlayerCreate(BaseModel):
@@ -78,4 +80,93 @@ def create_player(player: PlayerCreate):
     return {
         "message": "Player created successfully",
         "player_id": new_id
+    }
+
+@app.put("/players/{player_id}")
+def update_player(player_id: int, player: PlayerCreate):
+
+    if player_id not in players:
+        raise HTTPException(
+            status_code=404,
+            detail="Player not found"
+        )
+
+    players[player_id] = {
+        "name": player.name,
+        "wins": player.wins,
+        "losses": player.losses,
+        "kills": player.kills
+    }
+
+    return {"message": "Player updated successfully"} 
+
+@app.delete("/players/{player_id}")
+def delete_player(player_id: int):
+
+    if player_id not in players:
+        raise HTTPException(
+            status_code=404,
+            detail="Player not found"
+        )
+
+    del players[player_id]
+
+    return {"message": "Player deleted successfully"}
+
+@app.get("/database/players/{player_id}")
+def get_database_player(player_id: int):
+    connection = sqlite3.connect("players.db")
+    cursor = connection.cursor()
+
+    cursor.execute(
+        "SELECT * FROM players WHERE id = ?",
+        (player_id,)
+    )
+
+    player = cursor.fetchone()
+    connection.close()
+
+    if player is None:
+        raise HTTPException(
+            status_code=404,
+            detail="Player not found"
+        )
+    total_games = player[2] + player[3]
+
+    if total_games > 0:
+        win_rate = (player[2] / total_games) * 100
+        kills_per_game = player[4] / total_games
+
+    else:
+        win_rate = 0
+        kills_per_game = 0
+
+    return {
+        "id": player[0],
+        "name": player[1],
+        "wins": player[2],
+        "losses": player[3],
+        "kills": player[4],
+        "win_rate": win_rate,
+        "kills_per_game": kills_per_game
+    }
+
+@app.post("/database/players", status_code=201)
+def create_database_player(player: PlayerCreate):
+    connection = sqlite3.connect("players.db")
+    cursor = connection.cursor()
+
+    cursor.execute(
+        "INSERT INTO players (name, wins, losses, kills) VALUES (?, ?, ?, ?)",
+        (player.name, player.wins, player.losses, player.kills)
+    )
+
+    new_player_id = cursor.lastrowid
+
+    connection.commit()
+    connection.close()
+
+    return {
+        "id": new_player_id,
+        "message": "Player created successfully"
     }
