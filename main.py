@@ -1,3 +1,4 @@
+from multiprocessing import connection
 import sqlite3
 from fastapi import FastAPI, HTTPException
 from pydantic import BaseModel
@@ -169,4 +170,90 @@ def create_database_player(player: PlayerCreate):
     return {
         "id": new_player_id,
         "message": "Player created successfully"
+    }
+
+@app.get("/database/players")
+def get_all_database_players():
+    connection = sqlite3.connect("players.db")
+    cursor = connection.cursor()
+
+    cursor.execute("SELECT * FROM players")
+    players = cursor.fetchall()
+    
+    connection.close()
+
+    player_list = []
+
+    for player in players:
+        player_list.append({
+        "id": player[0],
+        "name": player[1],
+        "wins": player[2],
+        "losses": player[3],
+        "kills": player[4]
+    })
+    return player_list
+
+@app.put("/database/players/{player_id}")
+def update_database_player(player_id: int, player: PlayerCreate):
+    connection = sqlite3.connect("players.db")
+    cursor = connection.cursor()
+
+    cursor.execute(
+        """
+        UPDATE players
+        SET name = ?, wins = ?, losses = ?, kills = ?
+        WHERE id = ?
+        """,
+        (
+            player.name,
+            player.wins,
+            player.losses,
+            player.kills,
+            player_id
+        )
+    )
+
+    rows_updated = cursor.rowcount
+
+    if rows_updated == 0:
+        connection.close()
+        raise HTTPException(
+            status_code=404,
+            detail="Player not found"
+        )
+
+    connection.commit()
+    connection.close()
+
+    return {
+        "id": player_id,
+        "message": "Player updated successfully"
+    }
+
+@app.delete("/database/players/{player_id}")
+def delete_database_player(player_id: int):
+    connection = sqlite3.connect("players.db")
+    cursor = connection.cursor()
+
+    cursor.execute(
+        "DELETE FROM players WHERE id = ?",
+        (player_id,)
+    )
+
+    rows_deleted = cursor.rowcount
+
+    if rows_deleted == 0:
+        connection.close()
+        raise HTTPException(
+            status_code=404,
+            detail="Player not found"
+        )
+
+    connection.commit()
+    connection.close()
+
+    return {
+        "id": player_id,
+        "message": "Player deleted successfully"
     }

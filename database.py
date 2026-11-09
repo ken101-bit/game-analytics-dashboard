@@ -31,3 +31,4 @@ connection.commit()
 connection.close()
 
 print("Players table created successfully!")
+
